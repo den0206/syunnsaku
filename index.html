@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中間地点レストラン検索 - Syunsaku</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>中間地点レストラン検索</h1>
+        <p>二人の位置から中間地点のレストランを見つけよう</p>
+    </header>
+
+    <main>
+        <div class="input-section">
+            <div class="location-input">
+                <label for="location1">場所1:</label>
+                <input type="text" id="location1" placeholder="住所を入力してEnterまたは検索ボタンをクリック">
+                <button id="search-location1">検索</button>
+                <button id="get-location1">現在地取得</button>
+            </div>
+            
+            <div class="location-input">
+                <label for="location2">場所2:</label>
+                <input type="text" id="location2" placeholder="住所を入力してEnterまたは検索ボタンをクリック">
+                <button id="search-location2">検索</button>
+                <button id="get-location2">現在地取得</button>
+            </div>
+            
+            <button id="search-btn">中間地点を検索</button>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="stations-section" id="stations-section" style="display:none;">
+            <h2>中間地点付近の駅</h2>
+            <div id="stations-list"></div>
+        </div>
+
+        <div class="results-section">
+            <h2 id="results-title">検索結果</h2>
+            <div class="filters">
+                <select id="category-filter">
+                    <option value="">すべてのカテゴリ</option>
+                    <option value="restaurant">レストラン</option>
+                    <option value="cafe">カフェ</option>
+                    <option value="fast_food">ファストフード</option>
+                </select>
+            </div>
+            <div id="results-list"></div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
