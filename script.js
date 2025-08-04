@@ -7,6 +7,11 @@ class MiddlePointFinder {
         this.midpoint = null;
         this.selectedStation = null;
         this.nearbyStations = [];
+        this.isFullscreen = false;
+        this.currentResults = [];
+        this.sortMode = 'distance';
+        this.inputTimers = {};
+        this.snackbarTimeout = null;
         this.init();
     }
 
@@ -62,11 +67,57 @@ class MiddlePointFinder {
             }
         });
 
+        // Input change detection for snackbar
+        const location1Input = document.getElementById('location1');
+        const location2Input = document.getElementById('location2');
+        
+        console.log('Setting up input listeners:', location1Input, location2Input);
+        
+        location1Input.addEventListener('input', (e) => {
+            console.log('Location1 input event fired');
+            this.handleInputChange(e.target.value, 1);
+        });
+
+        location2Input.addEventListener('input', (e) => {
+            console.log('Location2 input event fired');
+            this.handleInputChange(e.target.value, 2);
+        });
+
         document.getElementById('category-filter').addEventListener('change', () => {
             if (this.selectedStation) {
                 this.searchNearbyPlaces(this.selectedStation.lat, this.selectedStation.lng);
             }
         });
+
+        // Sort controls
+        document.getElementById('sort-distance').addEventListener('click', () => {
+            this.setSortMode('distance');
+        });
+
+        document.getElementById('sort-name').addEventListener('click', () => {
+            this.setSortMode('name');
+        });
+
+        // Map control events
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            this.toggleFullscreen();
+        });
+
+        document.getElementById('locate-btn').addEventListener('click', () => {
+            this.goToCurrentLocation();
+        });
+
+        document.getElementById('reset-view-btn').addEventListener('click', () => {
+            this.resetMapView();
+        });
+
+        // Escape key to exit fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isFullscreen) {
+                this.toggleFullscreen();
+            }
+        });
+
     }
 
     handleMapClick(e) {
@@ -102,6 +153,13 @@ class MiddlePointFinder {
 
     async geocodeAddress(address, locationNumber) {
         if (!address.trim()) return;
+
+        // Clear input timer and hide snackbar when search is executed
+        if (this.inputTimers[locationNumber]) {
+            clearTimeout(this.inputTimers[locationNumber]);
+            delete this.inputTimers[locationNumber];
+        }
+        this.hideSnackbar();
 
         console.log(`Geocoding address: "${address}" for location ${locationNumber}`);
 
@@ -231,7 +289,15 @@ class MiddlePointFinder {
         if (!this.midpoint) return;
 
         const stationsDiv = document.getElementById('stations-list');
-        stationsDiv.innerHTML = '<div class="loading">駅を検索中...</div>';
+        stationsDiv.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>駅を検索中...</span>
+            </div>
+        `;
+
+        // Show skeleton loading for stations
+        this.showStationSkeleton();
 
         try {
             const overpassQuery = this.buildStationQuery(this.midpoint.lat, this.midpoint.lng);
@@ -243,12 +309,40 @@ class MiddlePointFinder {
 
             const data = await response.json();
             this.nearbyStations = data.elements.filter(station => station.tags && station.tags.name);
-            this.displayStations(this.nearbyStations);
+            
+            // Add a small delay for better UX
+            setTimeout(() => {
+                this.displayStations(this.nearbyStations);
+            }, 500);
 
         } catch (error) {
             console.error('Station search error:', error);
-            stationsDiv.innerHTML = '<div class="loading">駅の検索中にエラーが発生しました</div>';
+            stationsDiv.innerHTML = `
+                <div class="loading">
+                    <span>駅の検索中にエラーが発生しました</span>
+                </div>
+            `;
         }
+    }
+
+    showStationSkeleton() {
+        const stationsDiv = document.getElementById('stations-list');
+        let skeletonHTML = '';
+        
+        for (let i = 0; i < 5; i++) {
+            skeletonHTML += `
+                <div class="skeleton-item">
+                    <div class="skeleton-line title skeleton"></div>
+                    <div class="skeleton-line subtitle skeleton"></div>
+                </div>
+            `;
+        }
+        
+        setTimeout(() => {
+            if (stationsDiv.innerHTML.includes('spinner')) {
+                stationsDiv.innerHTML = skeletonHTML;
+            }
+        }, 800);
     }
 
     async searchNearbyPlaces(lat = null, lng = null) {
@@ -258,7 +352,15 @@ class MiddlePointFinder {
         if (!searchLat || !searchLng) return;
 
         const resultsDiv = document.getElementById('results-list');
-        resultsDiv.innerHTML = '<div class="loading">レストランを検索中...</div>';
+        resultsDiv.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>レストランを検索中...</span>
+            </div>
+        `;
+
+        // Show skeleton loading for results
+        this.showResultsSkeleton();
 
         try {
             const category = document.getElementById('category-filter').value || 'restaurant';
@@ -270,12 +372,42 @@ class MiddlePointFinder {
             });
 
             const data = await response.json();
-            this.displayResults(data.elements, searchLat, searchLng);
+            
+            // Add a small delay for better UX
+            setTimeout(() => {
+                this.displayResults(data.elements, searchLat, searchLng);
+            }, 500);
 
         } catch (error) {
             console.error('Search error:', error);
-            resultsDiv.innerHTML = '<div class="loading">検索中にエラーが発生しました</div>';
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <span>検索中にエラーが発生しました</span>
+                </div>
+            `;
         }
+    }
+
+    showResultsSkeleton() {
+        const resultsDiv = document.getElementById('results-list');
+        let skeletonHTML = '';
+        
+        for (let i = 0; i < 6; i++) {
+            skeletonHTML += `
+                <div class="skeleton-item">
+                    <div class="skeleton-line title skeleton"></div>
+                    <div class="skeleton-line content skeleton"></div>
+                    <div class="skeleton-line content skeleton"></div>
+                    <div class="skeleton-line subtitle skeleton"></div>
+                </div>
+            `;
+        }
+        
+        setTimeout(() => {
+            if (resultsDiv.innerHTML.includes('spinner')) {
+                resultsDiv.innerHTML = skeletonHTML;
+            }
+        }, 800);
     }
 
     buildOverpassQuery(lat, lng, category) {
@@ -331,8 +463,8 @@ class MiddlePointFinder {
             return { ...station, distance };
         }).sort((a, b) => a.distance - b.distance);
 
-        stationsDiv.innerHTML = stationsWithDistance.slice(0, 10).map(station => `
-            <div class="station-item" onclick="app.selectStation(${station.lat}, ${station.lon}, '${station.tags.name}', this)">
+        stationsDiv.innerHTML = stationsWithDistance.slice(0, 10).map((station, index) => `
+            <div class="station-item fade-in" style="animation-delay: ${index * 0.1}s" onclick="app.selectStation(${station.lat}, ${station.lon}, '${station.tags.name}', this)">
                 <div class="station-info">
                     <h3>${station.tags.name}</h3>
                     <p>${station.tags.operator || ''} ${station.tags.railway || ''}</p>
@@ -404,31 +536,65 @@ class MiddlePointFinder {
 
     displayResults(places, searchLat, searchLng) {
         const resultsDiv = document.getElementById('results-list');
+        const countDiv = document.getElementById('results-count');
         
         if (places.length === 0) {
             resultsDiv.innerHTML = '<div class="loading">近くにレストランが見つかりませんでした</div>';
+            countDiv.textContent = '';
             return;
         }
 
         const validPlaces = places.filter(place => place.tags && place.tags.name);
         
-        resultsDiv.innerHTML = validPlaces.slice(0, 20).map(place => {
+        // Add distance to each place and store for sorting
+        this.currentResults = validPlaces.map(place => {
             const distance = this.calculateDistance(
                 searchLat, searchLng,
                 place.lat || place.center.lat, place.lon || place.center.lon
             );
+            return { ...place, distance, searchLat, searchLng };
+        });
 
-            return `
-                <div class="result-item" onclick="app.showPlaceOnMap(${place.lat || place.center.lat}, ${place.lon || place.center.lon}, '${place.tags.name}')">
-                    <h3>${place.tags.name}</h3>
-                    <p><strong>カテゴリ:</strong> ${this.getCategoryName(place.tags.amenity)}</p>
-                    <p><strong>距離:</strong> ${distance}m</p>
-                    ${place.tags.cuisine ? `<p><strong>料理:</strong> ${place.tags.cuisine}</p>` : ''}
-                    ${place.tags.phone ? `<p><strong>電話:</strong> ${place.tags.phone}</p>` : ''}
-                    ${place.tags.website ? `<p><strong>Website:</strong> <a href="${place.tags.website}" target="_blank">リンク</a></p>` : ''}
-                </div>
-            `;
-        }).join('');
+        this.renderResults();
+    }
+
+    renderResults() {
+        const resultsDiv = document.getElementById('results-list');
+        const countDiv = document.getElementById('results-count');
+        
+        if (this.currentResults.length === 0) return;
+
+        // Sort results
+        let sortedResults = [...this.currentResults];
+        if (this.sortMode === 'distance') {
+            sortedResults.sort((a, b) => a.distance - b.distance);
+        } else if (this.sortMode === 'name') {
+            sortedResults.sort((a, b) => a.tags.name.localeCompare(b.tags.name));
+        }
+
+        countDiv.textContent = `${sortedResults.length} 件の結果`;
+
+        resultsDiv.innerHTML = sortedResults.slice(0, 20).map((place, index) => `
+            <div class="result-item fade-in" style="animation-delay: ${index * 0.05}s" onclick="app.showPlaceOnMap(${place.lat || place.center.lat}, ${place.lon || place.center.lon}, '${place.tags.name}')">
+                <h3>${place.tags.name}</h3>
+                <p><strong>カテゴリ:</strong> <span class="category-badge">${this.getCategoryName(place.tags.amenity)}</span></p>
+                <p><strong>距離:</strong> <span class="distance-badge">${place.distance}m</span></p>
+                ${place.tags.cuisine ? `<p><strong>料理:</strong> ${place.tags.cuisine}</p>` : ''}
+                ${place.tags.phone ? `<p><strong>電話:</strong> ${place.tags.phone}</p>` : ''}
+                ${place.tags.website ? `<p><strong>Website:</strong> <a href="${place.tags.website}" target="_blank">リンク</a></p>` : ''}
+            </div>
+        `).join('');
+    }
+
+    setSortMode(mode) {
+        this.sortMode = mode;
+        
+        // Update active sort button
+        document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`sort-${mode}`).classList.add('active');
+        
+        // Re-render results with new sort
+        this.renderResults();
     }
 
     getCategoryName(amenity) {
@@ -463,6 +629,169 @@ class MiddlePointFinder {
             .setLatLng([lat, lng])
             .setContent(name)
             .openOn(this.map);
+    }
+
+    toggleFullscreen() {
+        const mapContainer = document.getElementById('map-container');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        
+        if (!this.isFullscreen) {
+            mapContainer.classList.add('fullscreen-map');
+            fullscreenBtn.textContent = '✕';
+            fullscreenBtn.title = 'フルスクリーン終了';
+            this.isFullscreen = true;
+        } else {
+            mapContainer.classList.remove('fullscreen-map');
+            fullscreenBtn.textContent = '⛶';
+            fullscreenBtn.title = 'フルスクリーン';
+            this.isFullscreen = false;
+        }
+        
+        // Resize map after fullscreen toggle
+        setTimeout(() => {
+            this.map.invalidateSize();
+        }, 100);
+    }
+
+    goToCurrentLocation() {
+        if (navigator.geolocation) {
+            const locateBtn = document.getElementById('locate-btn');
+            locateBtn.classList.add('pulse');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    this.map.setView([lat, lng], 15);
+                    
+                    L.popup()
+                        .setLatLng([lat, lng])
+                        .setContent('現在地')
+                        .openOn(this.map);
+                    
+                    locateBtn.classList.remove('pulse');
+                },
+                (error) => {
+                    alert('位置情報の取得に失敗しました: ' + error.message);
+                    locateBtn.classList.remove('pulse');
+                }
+            );
+        } else {
+            alert('このブラウザでは位置情報がサポートされていません');
+        }
+    }
+
+    resetMapView() {
+        if (this.location1 && this.location2 && this.midpoint) {
+            const bounds = L.latLngBounds([
+                [this.location1.lat, this.location1.lng],
+                [this.location2.lat, this.location2.lng],
+                [this.midpoint.lat, this.midpoint.lng]
+            ]);
+            this.map.fitBounds(bounds, { padding: [20, 20] });
+        } else {
+            this.map.setView([35.6762, 139.6503], 10);
+        }
+    }
+
+    handleInputChange(value, locationNumber) {
+        console.log(`Input change detected: location${locationNumber}, value: "${value}"`);
+        
+        // Clear existing timer for this location
+        if (this.inputTimers[locationNumber]) {
+            clearTimeout(this.inputTimers[locationNumber]);
+            console.log(`Cleared existing timer for location${locationNumber}`);
+        }
+
+        // Hide existing snackbar
+        this.hideSnackbar();
+
+        // If input has content, set timer for snackbar
+        if (value.trim().length > 1) {
+            console.log(`Setting timer for location${locationNumber}, value length: ${value.trim().length}`);
+            this.inputTimers[locationNumber] = setTimeout(() => {
+                console.log(`Timer fired for location${locationNumber}, showing snackbar`);
+                this.showSnackbar(`検索ボタンを押下してください`, locationNumber);
+            }, 2000); // Show after 2 seconds
+        }
+    }
+
+    showSnackbar(message, locationNumber) {
+        console.log(`showSnackbar called with message: "${message}", locationNumber: ${locationNumber}`);
+        
+        // Remove existing snackbar if any
+        const existingSnackbar = document.querySelector('.snackbar');
+        if (existingSnackbar) {
+            console.log('Removing existing snackbar');
+            existingSnackbar.remove();
+        }
+
+        // Create snackbar element
+        const snackbar = document.createElement('div');
+        snackbar.className = 'snackbar';
+        snackbar.innerHTML = `
+            <span class="snackbar-icon">🔍</span>
+            <span>${message}</span>
+            <button class="snackbar-close">&times;</button>
+        `;
+
+        console.log('Created snackbar element:', snackbar);
+
+        // Add to body
+        document.body.appendChild(snackbar);
+        console.log('Added snackbar to body');
+
+        // Show with animation
+        setTimeout(() => {
+            console.log('Adding show class to snackbar');
+            snackbar.classList.add('show');
+        }, 100);
+
+        // Auto hide after 5 seconds
+        this.snackbarTimeout = setTimeout(() => {
+            console.log('Auto-hiding snackbar after 5 seconds');
+            this.hideSnackbar();
+        }, 5000);
+
+        // Add click handler for close button
+        const closeBtn = snackbar.querySelector('.snackbar-close');
+        closeBtn.addEventListener('click', () => {
+            console.log('Close button clicked');
+            this.hideSnackbar();
+        });
+
+        // Add click handler to search button mention
+        snackbar.addEventListener('click', (e) => {
+            if (e.target.classList.contains('snackbar-close')) return;
+            
+            console.log('Snackbar clicked, highlighting search button');
+            // Highlight the corresponding search button
+            const searchBtn = document.getElementById(`search-location${locationNumber}`);
+            if (searchBtn) {
+                searchBtn.style.animation = 'pulse 0.6s ease-in-out 2';
+                setTimeout(() => {
+                    searchBtn.style.animation = '';
+                }, 1200);
+            }
+        });
+    }
+
+    hideSnackbar() {
+        const snackbar = document.querySelector('.snackbar');
+        if (snackbar) {
+            snackbar.classList.remove('show');
+            snackbar.classList.add('hide');
+            setTimeout(() => {
+                if (snackbar.parentNode) {
+                    snackbar.remove();
+                }
+            }, 400);
+        }
+
+        if (this.snackbarTimeout) {
+            clearTimeout(this.snackbarTimeout);
+            this.snackbarTimeout = null;
+        }
     }
 }
 
